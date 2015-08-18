@@ -309,7 +309,7 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
     NSAssert(((self.possibleDrawerDirection & direction) == direction), @"Unable to bounce open with impossible/multiple directions");
     
     self.currentDrawerDirection = direction;
-
+    
     [self addDynamicsBehaviorsToCreatePaneState:MSDynamicsDrawerPaneStateClosed pushMagnitude:self.bounceMagnitude pushAngle:[self gravityAngleForState:MSDynamicsDrawerPaneStateOpen direction:direction] pushElasticity:self.bounceElasticity];
     
     if (!allowUserInterruption) [self setViewUserInteractionEnabled:NO];
@@ -325,16 +325,16 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
 - (void)replaceViewController:(UIViewController *)existingViewController withViewController:(UIViewController *)newViewController inContainerView:(UIView *)containerView completion:(void (^)(void))completion
 {
     // Add initial view controller
-	if (!existingViewController && newViewController) {
+    if (!existingViewController && newViewController) {
         [newViewController willMoveToParentViewController:self];
         [newViewController beginAppearanceTransition:YES animated:NO];
-		[self addChildViewController:newViewController];
+        [self addChildViewController:newViewController];
         newViewController.view.frame = containerView.bounds;
-		[containerView addSubview:newViewController.view];
-		[newViewController didMoveToParentViewController:self];
+        [containerView addSubview:newViewController.view];
+        [newViewController didMoveToParentViewController:self];
         [newViewController endAppearanceTransition];
         if (completion) completion();
-	}
+    }
     // Remove existing view controller
     else if (existingViewController && !newViewController) {
         [existingViewController willMoveToParentViewController:nil];
@@ -740,7 +740,57 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
         [self.dynamicAnimator removeAllBehaviors];
     }
     
+    // UIDynamics has occasional hick-ups (maybe rounding errors), that result in a small "jiggle"
+    // when the pane opens/closes, so we need to make it behave consistently.
+    [self removeSlidingPaneJiggleEffect];
+    
     [self updateStylers];
+}
+
+- (void)removeSlidingPaneJiggleEffect {
+    if ((self.paneState == MSDynamicsDrawerPaneStateClosed || self.paneState == MSDynamicsDrawerPaneStateOpen)
+        && CGAffineTransformIsIdentity(self.paneView.transform)) {
+        CGRect paneFrame = self.paneView.frame;
+        
+        const CGFloat kSlidingPaneJiggleRoom = 4.0f;
+        if (self.potentialPaneState == MSDynamicsDrawerPaneStateOpen) {
+            if ((self.currentDrawerDirection & MSDynamicsDrawerDirectionLeft)
+                && self.openStateRevealWidth < paneFrame.origin.x && paneFrame.origin.x <= self.openStateRevealWidth + kSlidingPaneJiggleRoom) {
+                paneFrame.origin.x = self.openStateRevealWidth;
+                self.paneView.frame = paneFrame;
+            } else if ((self.currentDrawerDirection & MSDynamicsDrawerDirectionRight)
+                       && -self.openStateRevealWidth -kSlidingPaneJiggleRoom <= paneFrame.origin.x && paneFrame.origin.x < -self.openStateRevealWidth) {
+                paneFrame.origin.x = -self.openStateRevealWidth;
+                self.paneView.frame = paneFrame;
+            } else if ((self.currentDrawerDirection & MSDynamicsDrawerDirectionTop)
+                       && self.openStateRevealWidth < paneFrame.origin.y && paneFrame.origin.y <= self.openStateRevealWidth + kSlidingPaneJiggleRoom) {
+                paneFrame.origin.y = self.openStateRevealWidth;
+                self.paneView.frame = paneFrame;
+            } else if ((self.currentDrawerDirection & MSDynamicsDrawerDirectionBottom)
+                       && -self.openStateRevealWidth -kSlidingPaneJiggleRoom <= paneFrame.origin.y && paneFrame.origin.y < -self.openStateRevealWidth) {
+                paneFrame.origin.y = -self.openStateRevealWidth;
+                self.paneView.frame = paneFrame;
+            }
+        } else if (self.potentialPaneState == MSDynamicsDrawerPaneStateClosed) {
+            if ((self.currentDrawerDirection & MSDynamicsDrawerDirectionLeft)
+                && -kSlidingPaneJiggleRoom <= paneFrame.origin.x && paneFrame.origin.x < 0) {
+                paneFrame.origin.x = 0;
+                self.paneView.frame = paneFrame;
+            } else if ((self.currentDrawerDirection & MSDynamicsDrawerDirectionRight)
+                       && 0 < paneFrame.origin.x && paneFrame.origin.x <= kSlidingPaneJiggleRoom) {
+                paneFrame.origin.x = 0;
+                self.paneView.frame = paneFrame;
+            } else if ((self.currentDrawerDirection & MSDynamicsDrawerDirectionTop)
+                       && -kSlidingPaneJiggleRoom <= paneFrame.origin.y && paneFrame.origin.y < 0) {
+                paneFrame.origin.y = 0;
+                self.paneView.frame = paneFrame;
+            } else if ((self.currentDrawerDirection & MSDynamicsDrawerDirectionBottom)
+                       && 0 < paneFrame.origin.y && paneFrame.origin.y <= kSlidingPaneJiggleRoom) {
+                paneFrame.origin.y = 0;
+                self.paneView.frame = paneFrame;
+            }
+        }
+    }
 }
 
 - (void)setPaneState:(MSDynamicsDrawerPaneState)paneState
@@ -1315,7 +1365,7 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
             }
         }
     }
-	return YES;
+    return YES;
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
@@ -1374,20 +1424,23 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
 - (void)dynamicAnimatorDidPause:(UIDynamicAnimator *)animator
 {
     // If the dynaimc animator has paused while the `panePanGestureRecognizer` is active, ignore it as it's a side effect of removing behaviors, not a resting state
-    if (self.panePanGestureRecognizer.state != UIGestureRecognizerStatePossible) return;
+    if (self.panePanGestureRecognizer.state == UIGestureRecognizerStatePossible) {
+        
+        // Since a resting pane state has been reached, we can remove all behaviors
+        [self.dynamicAnimator removeAllBehaviors];
+        
+        // Update the pane state to the nearest pane state
+        [self _setPaneState:[self nearestPaneState]];
+        
+        // Update pane user interaction appropriately
+        [self setPaneViewControllerViewUserInteractionEnabled:(self.paneState == MSDynamicsDrawerPaneStateClosed)];
+        
+        // Since rotation is disabled while the dynamic animator is running, we invoke this method to cause rotation to happen (if device rotation has occured during state transition)
+        [UIViewController attemptRotationToDeviceOrientation];
+        
+    }
     
-    // Since a resting pane state has been reached, we can remove all behaviors
-    [self.dynamicAnimator removeAllBehaviors];
-    
-    // Update the pane state to the nearest pane state
-    [self _setPaneState:[self nearestPaneState]];
-    
-    // Update pane user interaction appropriately
-    [self setPaneViewControllerViewUserInteractionEnabled:(self.paneState == MSDynamicsDrawerPaneStateClosed)];
-    
-    // Since rotation is disabled while the dynamic animator is running, we invoke this method to cause rotation to happen (if device rotation has occured during state transition)
-    [UIViewController attemptRotationToDeviceOrientation];
-    
+    // Always call the completion block
     if (self.dynamicAnimatorCompletion) {
         self.dynamicAnimatorCompletion();
         self.dynamicAnimatorCompletion = nil;
