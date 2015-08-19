@@ -748,7 +748,7 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
 }
 
 - (void)removeSlidingPaneJiggleEffect {
-    if ((self.paneState == MSDynamicsDrawerPaneStateClosed || self.paneState == MSDynamicsDrawerPaneStateOpen)
+    if ((self.paneState == MSDynamicsDrawerPaneStateClosed || self.paneState == MSDynamicsDrawerPaneStateOpen || self.paneState == MSDynamicsDrawerPaneStateOpenWide)
         && CGAffineTransformIsIdentity(self.paneView.transform)) {
         CGRect paneFrame = self.paneView.frame;
         
