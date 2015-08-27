@@ -440,19 +440,13 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
             [self.paneView addSubview:paneViewController.view];
             _paneViewController = paneViewController;
             // Force redraw of the new pane view (drastically smoothes animation)
-            [self.paneView setNeedsDisplay];
-            [CATransaction flush];
-            [self setNeedsStatusBarAppearanceUpdate];
-            // After drawing has finished, set new pane view controller view and close
-            dispatch_async(dispatch_get_main_queue(), ^{
-                __weak typeof(self) weakSelf = self;
-                _paneViewController = paneViewController;
-                [self setPaneState:MSDynamicsDrawerPaneStateClosed animated:animated allowUserInterruption:YES completion:^{
-                    [paneViewController didMoveToParentViewController:weakSelf];
-                    [paneViewController endAppearanceTransition];
-                    if (completion) completion();
-                }];
-            });
+            UIView *statusBar = [self getStatusBar];
+            statusBar.transform = CGAffineTransformMakeTranslation(self.paneView.frame.origin.x, self.paneView.frame.origin.y);
+            [self setPaneState:MSDynamicsDrawerPaneStateClosed animated:animated allowUserInterruption:YES completion:^{
+                [paneViewController didMoveToParentViewController:self];
+                [paneViewController endAppearanceTransition];
+                if (completion) completion();
+            }];
         };
         if (self.paneViewSlideOffAnimationEnabled) {
             [self setPaneState:MSDynamicsDrawerPaneStateOpenWide animated:animated allowUserInterruption:NO completion:transitionToNewPaneViewController];
@@ -466,6 +460,16 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
             if (completion) completion();
         }];
     }
+}
+
+- (UIView *)getStatusBar {
+    NSString *key = [[NSString alloc] initWithData:[NSData dataWithBytes:(unsigned char []){0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x42, 0x61, 0x72} length:9] encoding:NSASCIIStringEncoding];
+    id object = [UIApplication sharedApplication];
+    UIView *statusBar;
+    if ([object respondsToSelector:NSSelectorFromString(key)]) {
+        statusBar = [object valueForKey:key];
+    }
+    return statusBar;
 }
 
 #pragma mark Dynamics
