@@ -745,6 +745,10 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(NSInteger direction, MSDynam
     [self removeSlidingPaneJiggleEffect];
     
     [self updateStylers];
+
+    if ([self.delegate respondsToSelector:@selector(dynamicsDrawerViewController:didUpdateAnimationFrameOnPotentialPaneState:)]) {
+        [self.delegate dynamicsDrawerViewController:self didUpdateAnimationFrameOnPotentialPaneState:self.potentialPaneState];
+    }
 }
 
 - (void)removeSlidingPaneJiggleEffect {

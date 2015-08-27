@@ -586,6 +586,9 @@ void MSDynamicsDrawerDirectionActionForMaskedValues(MSDynamicsDrawerDirection di
  */
 - (BOOL)dynamicsDrawerViewController:(MSDynamicsDrawerViewController *)drawerViewController shouldBeginPanePan:(UIPanGestureRecognizer *)panGestureRecognizer;
 
+
+- (void)dynamicsDrawerViewController:(MSDynamicsDrawerViewController *)drawerViewController didUpdateAnimationFrameOnPotentialPaneState:(MSDynamicsDrawerPaneState)potentialPaneState;
+
 @end
 
 #import "MSDynamicsDrawerStyler.h"
